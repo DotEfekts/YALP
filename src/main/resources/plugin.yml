@@ -1,0 +1,7 @@
+name: YALP
+main: net.dotefekts.yalp.LootBoxes
+version: 1.0
+author: DotEfekts
+website: http://www.dotefekts.net/
+depend: [DotUtilities,ProtocolLib]
+api-version: 1.15
