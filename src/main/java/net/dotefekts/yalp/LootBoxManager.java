@@ -119,6 +119,13 @@ public class LootBoxManager {
 		
 		return item;
 	}
+	
+	public LootBox getBoxByInv(Inventory inv) {
+		for(InventoryView view : openBoxes.keySet())
+			if(view.getTopInventory() == inv)
+				return openBoxes.get(view);
+		return null;
+	}
 
 	public void openBox(Player player, LootBox box) {
 		ItemStack[] contents = box.getContents();
@@ -346,8 +353,6 @@ public class LootBoxManager {
 			dataAccess.deleteLootBoxes(getRemovedBoxes());
 			dataAccess.saveLootBoxes(getBoxes());
 			dataAccess.saveOpens(playerOpens);
-			
-			logger.info("Lootboxes flushed to the database.");
 		} catch (SQLException e) {
 			e.printStackTrace();
 			logger.severe("Error attempting to flush lootbox information to the database.");

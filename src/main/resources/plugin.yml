@@ -5,3 +5,13 @@ author: DotEfekts
 website: http://www.dotefekts.net/
 depend: [DotUtilities,ProtocolLib]
 api-version: 1.15
+permissions:
+  yalp.manage:
+    default: op
+    description: Allows for managment of lootboxes.
+  yalp.bypass.cost:
+    default: op
+    description: Allows a user to ignore the cost of opening a lootbox.
+  yalp.bypass.cooldown:
+    default: op
+    description: Allows a user to ignore the cooldown for opening a lootbox.

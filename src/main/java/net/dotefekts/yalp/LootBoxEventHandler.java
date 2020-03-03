@@ -1,6 +1,7 @@
 package net.dotefekts.yalp;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.UUID;
 import java.util.logging.Logger;
@@ -9,17 +10,25 @@ import org.bukkit.Bukkit;
 import org.bukkit.ChatColor;
 import org.bukkit.Location;
 import org.bukkit.Material;
+import org.bukkit.block.Block;
+import org.bukkit.block.BlockFace;
+import org.bukkit.block.data.type.Chest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.Action;
 import org.bukkit.event.block.BlockBreakEvent;
+import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.inventory.InventoryAction;
+import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.event.inventory.InventoryType;
 import org.bukkit.event.player.AsyncPlayerChatEvent;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.event.world.WorldSaveEvent;
+import org.bukkit.inventory.DoubleChestInventory;
 import org.bukkit.inventory.Inventory;
 import org.bukkit.inventory.InventoryHolder;
 import org.bukkit.inventory.ItemStack;
@@ -167,7 +176,14 @@ public class LootBoxEventHandler implements ButtonListener, Listener {
 						boolean isEditing = editMode.contains(player.getUniqueId());
 	
 						if(isEditing) {
+							event.setCancelled(true);
+							
 							if(box == null) {
+								if(ih.getInventory() instanceof DoubleChestInventory) {
+									player.sendMessage(ChatColor.RED + "Sorry, you cannot make a double chest into a lootbox.");
+									return;
+								}
+								
 								box = boxManager.createBox(inv, location);
 								inv.setContents(new ItemStack[inv.getSize()]);
 								player.sendMessage(ChatColor.YELLOW + "Created new lootbox.");
@@ -182,9 +198,6 @@ public class LootBoxEventHandler implements ButtonListener, Listener {
 								logger.severe("An error occurred while attempting to open a lootbox edit menu.");
 								player.sendMessage(ChatColor.RED + "An error occurred while attempting to open the edit menu.");
 							}
-							
-							event.setCancelled(true);
-							
 						} else if(box != null) {
 							boxManager.openBox(player, box);
 							event.setCancelled(true);
@@ -226,6 +239,46 @@ public class LootBoxEventHandler implements ButtonListener, Listener {
 	}
 	
 	@EventHandler
+	public void blockPlaced(BlockPlaceEvent event) {
+		if(!event.getPlayer().isSneaking()
+				&& (event.getBlockPlaced().getType() == Material.CHEST || event.getBlockPlaced().getType() == Material.TRAPPED_CHEST)) {
+			Material material = event.getBlockPlaced().getType();
+			Chest placed = (Chest) event.getBlockPlaced().getBlockData();
+			boolean cancel = false;
+			
+			if(placed.getFacing() == BlockFace.NORTH || placed.getFacing() == BlockFace.SOUTH) {
+				Block westBlock = event.getBlock().getRelative(BlockFace.WEST);
+				LootBox westBox = boxManager.getBox(westBlock.getLocation());
+				if(westBox != null && westBlock.getType() == material && ((Chest) westBlock.getBlockData()).getFacing() == placed.getFacing()) {
+					cancel = true;
+				} else {
+					Block eastBlock = event.getBlock().getRelative(BlockFace.EAST);
+					LootBox eastBox = boxManager.getBox(eastBlock.getLocation());
+					if(eastBox != null && eastBlock.getType() == material && ((Chest) eastBlock.getBlockData()).getFacing() == placed.getFacing())
+						cancel = true;
+				}
+			} else {
+				Block northBlock = event.getBlock().getRelative(BlockFace.NORTH);
+				LootBox northBox = boxManager.getBox(northBlock.getLocation());
+				if(northBox != null && northBlock.getType() == material && ((Chest) northBlock.getBlockData()).getFacing() == placed.getFacing()) {
+					cancel = true;
+				} else {
+					Block southBlock = event.getBlock().getRelative(BlockFace.SOUTH);
+					LootBox southBox = boxManager.getBox(southBlock.getLocation());
+					if(southBox != null && southBlock.getType() == material && ((Chest) southBlock.getBlockData()).getFacing() == placed.getFacing())
+						cancel = true;
+				}
+			}
+			
+			if(cancel) {
+				event.setCancelled(true);
+				event.getPlayer().sendMessage(ChatColor.RED + "Sorry, you cannot place this next to a lootbox.");
+			}
+		}
+			
+	}
+	
+	@EventHandler
 	public void blockBroken(BlockBreakEvent event) {
 		LootBox box = boxManager.getBox(event.getBlock().getLocation());
 		if(box != null) {
@@ -263,6 +316,40 @@ public class LootBoxEventHandler implements ButtonListener, Listener {
 				menu.markDestruction();
 			}
 		}
+	}
+	
+	private InventoryAction[] blockedActions = {
+		InventoryAction.HOTBAR_SWAP, 
+		InventoryAction.PLACE_ALL, 
+		InventoryAction.PLACE_ONE,
+		InventoryAction.PLACE_SOME,
+		InventoryAction.SWAP_WITH_CURSOR
+	};
+	
+	@EventHandler
+	public void inventoryClick(InventoryClickEvent event) {
+		if(Arrays.asList(blockedActions).contains(event.getAction())
+				&& boxManager.getBoxByInv(event.getClickedInventory()) != null)
+			event.setCancelled(true);
+		else if(event.getAction() == InventoryAction.MOVE_TO_OTHER_INVENTORY
+				&& event.getInventory() != event.getClickedInventory()
+				&& boxManager.getBoxByInv(event.getInventory()) != null)
+			event.setCancelled(true);
+			
+	}
+	
+	@EventHandler
+	public void inventoryDrag(InventoryDragEvent event) {
+		LootBox box = boxManager.getBoxByInv(event.getInventory());
+		if(box != null) {
+			boolean isInBox = false;
+			for(int slot : event.getRawSlots())
+				if(slot < box.getContents().length)
+					isInBox = true;
+			if(isInBox)
+				event.setCancelled(true);
+		}
+			
 	}
 	
 	@EventHandler
